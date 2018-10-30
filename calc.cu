@@ -280,7 +280,7 @@ __global__ void launch(double** prices, int* sizes, int n, int* status, double**
 			d2_5 = new double[sizes[i]];
 			d2_10 = new double[sizes[i]];
 			// do{
-			std = new double[sizes[i]];	//for some reason this sometimes sets to the null pointer, might run out of memory? no fucking clue why
+			std = new double[sizes[i]];
 				// if(std == 0)
 					// delete[] std;
 			// }while(std == 0);
