@@ -98,17 +98,17 @@ class Exch():
 
 def main():
 	exchanges = []
-	# exchanges.append(Exch("nasdaq"))
-	# # exchanges.append(Exch("nyse"))
-	# # exchanges.append(Exch("amex"))
-	# symbols = []
-	# for item in exchanges:
-	# 		with open(item.filepath, 'r') as file:
-	# 			reader = csv.DictReader(file)
-	# 			for row in reader:
-	# 				if row['Symbol'] not in symbols and " " not in row['Symbol']:
-	# 					symbols.append(row['Symbol'])
-	symbols = ["AABA"]
+	exchanges.append(Exch("nasdaq"))
+	# exchanges.append(Exch("nyse"))
+	# exchanges.append(Exch("amex"))
+	symbols = []
+	for item in exchanges:
+			with open(item.filepath, 'r') as file:
+				reader = csv.DictReader(file)
+				for row in reader:
+					if row['Symbol'] not in symbols and " " not in row['Symbol']:
+						symbols.append(row['Symbol'])
+	# symbols = ["AABA"]
 
 	threads = []
 
