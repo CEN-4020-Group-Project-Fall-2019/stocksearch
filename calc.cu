@@ -252,7 +252,7 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 			double maxDown = priceDown - strikes[i];
 			if(maxDown < 0) maxDown = 0;
 			double valPrice = (maxUp-maxDown)/(priceUp-priceDown);
-			optionPrices[i] = (stockPrices[numDays-1] * valPrice) + ((maxUp - (priceUp * valPrice))/exp(R*maturity[i]));
+			optionPrices[i] = (stockPrices[numDays-1] * valPrice) + ((maxUp - (priceUp * valPrice))/exp(-R*maturity[i]));
 			// printf("%d %f %f %f %f\n", i, stockPrices[numDays-1], maturity[i], strikes[i], optionPrices[i]);
 		}
 	}
