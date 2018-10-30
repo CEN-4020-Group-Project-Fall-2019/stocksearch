@@ -21,7 +21,8 @@ class Stock(threading.Thread):
 	def __init__(self, symbol):
 		super(Stock, self).__init__()
 		self.symbol = symbol
-		self.ts = av(key='EZR9O8KQ47UHIL9G', output_format='csv')
+		# self.ts = av(key='EZR9O8KQ47UHIL9G', output_format='csv')
+		self.ts = av(key='AJ3OQA9ZGO0LM923', output_format='csv')
 		
 		self.success = True
 		try:
@@ -64,16 +65,16 @@ class Stock(threading.Thread):
 						# print "###############Calls###############"
 						for item in processed['optionChain']['result'][0]['options'][0]['calls']:
 							optionFile.write("C" + ',' + str(date) + ',' + str(item['strike']) + "," + str(item['bid']) + "," + str(item['ask']) + "," + str(item["impliedVolatility"])+'\n')
-						
-						with open(stock_path + self.symbol + ".csv", 'w') as file:
-							writer = csv.writer(file)
-							for row in self.data:
-								writer.writerow(row)
-							os.system("tail -n +2 " + stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
 
 					except urllib2.HTTPError:
 						print optionURL + self.symbol + " URL Not Found" + "?date=" + str(date)
 						return
+				with open(stock_path + self.symbol + ".csv", 'w') as file:
+					writer = csv.writer(file)
+					print "Writing AV Buffer"
+					for row in self.data:
+						writer.writerow(row)
+					os.system("tail -n +2 " + stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
 			
 			
 		# print self.symbol
@@ -97,17 +98,17 @@ class Exch():
 
 def main():
 	exchanges = []
-	exchanges.append(Exch("nasdaq"))
-	# exchanges.append(Exch("nyse"))
-	# exchanges.append(Exch("amex"))
-	symbols = []
-	for item in exchanges:
-			with open(item.filepath, 'r') as file:
-				reader = csv.DictReader(file)
-				for row in reader:
-					if row['Symbol'] not in symbols and " " not in row['Symbol']:
-						symbols.append(row['Symbol'])
-	# symbols = ["AABA"]
+	# exchanges.append(Exch("nasdaq"))
+	# # exchanges.append(Exch("nyse"))
+	# # exchanges.append(Exch("amex"))
+	# symbols = []
+	# for item in exchanges:
+	# 		with open(item.filepath, 'r') as file:
+	# 			reader = csv.DictReader(file)
+	# 			for row in reader:
+	# 				if row['Symbol'] not in symbols and " " not in row['Symbol']:
+	# 					symbols.append(row['Symbol'])
+	symbols = ["AABA"]
 
 	threads = []
 
@@ -125,7 +126,7 @@ def main():
 	for thread in threads:
 		thread.join()
 
-	# os.system(executable_path + "calc")
+	os.system(executable_path + "calc")
 
 if __name__ == '__main__':
 	main()

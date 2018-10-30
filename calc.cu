@@ -213,6 +213,7 @@ int parseDate(char* date){
 }
 
 __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, double* maturity, bool* call, double* optionPrices, int numOptions){
+	// printf("Called OptionPrice\n");
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
 	double R = 1.0202;
 	__shared__ double deviation;
@@ -239,7 +240,7 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 	}
 
 	__syncthreads();
-
+	// printf("%d\n", numOptions);
 	if (i < numOptions){
 		if(call[i]){
 			double priceUp = stockPrices[numDays-1] + stockPrices[numDays-1] * deviation * maturity[i];
@@ -252,7 +253,7 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 			double maxDown = priceDown - strikes[i];
 			if(maxDown < 0) maxDown = 0;
 			double valPrice = (maxUp-maxDown)/(priceUp-priceDown);
-			optionPrices[i] = (stockPrices[numDays-1] * valPrice) + ((maxUp - (priceUp * valPrice))/exp(-R*maturity[i]));
+			optionPrices[i] = (stockPrices[numDays-1] * valPrice) + ((maxUp - (priceUp * valPrice))*exp(R*maturity[i]));
 			// printf("%d %f %f %f %f\n", i, stockPrices[numDays-1], maturity[i], strikes[i], optionPrices[i]);
 		}
 	}
@@ -265,6 +266,7 @@ __global__ void launch(double** prices, int* sizes, int n, int* status, double**
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
 	// printf("%d %d\n", i, n);
 	if(i < n){
+		printf("in kernel %d\n", sizes[i]);
 		if(sizes[i] > 10){
 			// printf("%d < %d\n", i, n);
 			// printf("%d %d\n", i, prices[i][0]);
@@ -307,10 +309,14 @@ __global__ void launch(double** prices, int* sizes, int n, int* status, double**
 			cudaDeviceSynchronize();
 			stdDev<<<blocks, threads>>>(sizes[i], 20, prices[i], std);
 			cudaDeviceSynchronize();
-			if(sizes[i] >= 253)
+			if(sizes[i] >= 253){
+				// printf("Attempting to Launch optionPrice\n");
 				optionPrice<<<numOptions[i]/512+1, 512>>>(&(prices[i][sizes[i]-253]), 252, strikes[i], exp[i], calls[i], optionPrices[i], numOptions[i]);
-			else
+			}			
+			else{
+				// printf("Attempting to Launch optionPrice with fewer than 253 options\n");
 				optionPrice<<<numOptions[i]/512+1, 512>>>(prices[i], sizes[i], strikes[i], exp[i], calls[i], optionPrices[i], numOptions[i]);
+			}
 			cudaDeviceSynchronize();
 
 			// void* paramlist[3] = {(void*)&sizes[i], (void*)&ave, (void*)&stdev};
@@ -461,6 +467,7 @@ int main(int argc, char** argv) {
 	// double** prices, int* sizes, int n, int* status, double** optionPrices, double** strikes, int** exp, bool** calls, int* numOptions
 
 	cudaDeviceSynchronize();
+	printf("launching kernel\n");
 	launch<<<dataList.size()/512+1, 512>>>(d_prices, d_pSizes, dataList.size(), d_status, d_optionPrices, d_strikes, d_exp, d_call, d_numOptions);
 	cudaDeviceSynchronize();
 
