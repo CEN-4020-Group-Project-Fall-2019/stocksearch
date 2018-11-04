@@ -365,6 +365,7 @@ int main(int argc, char** argv) {
 	// 	cout<<"Context initialized"<<endl;
 	// }
 	vector<char*>* symbols = new vector<char*>();
+	
 	if(argc <= 1)
 		listDir("./proc", symbols);
 	else{
@@ -377,6 +378,7 @@ int main(int argc, char** argv) {
 		}
 
 	}
+
 	vector<AVData*> dataList = vector<AVData*>();
 	vector<OptionData*> optionList = vector<OptionData*>();
 

@@ -6,6 +6,11 @@ import time
 import os
 import sys
 import json
+import requests
+import pickle
+import pandas
+import io
+from datetime import datetime
 
 executable_path = "/home/aidan/stocks/"
 exchange_path = "/home/aidan/stocks/exchanges/"
@@ -20,19 +25,46 @@ optionURL = "https://query1.finance.yahoo.com/v7/finance/options/"
 class Stock(threading.Thread):
 	def __init__(self, symbol):
 		super(Stock, self).__init__()
+		self.success = False
 		self.symbol = symbol
-		self.ts = av(key='PRP85LL7AYYVHTZD', output_format='csv')
+		# self.ts = av(key='PRP85LL7AYYVHTZD', output_format='csv')
 		# self.ts = av(key='AJ3OQA9ZGO0LM923', output_format='csv')
 		
-		self.success = True
-		try:
-			self.optionData = urllib2.urlopen(optionURL + self.symbol)
-		except urllib2.HTTPError:
-			print optionURL + self.symbol + " URL Not Found"
-			self.success = False
+		
+					# self.success = False
+			# else:
+				# self.success = False
+			# print data.text
+			# substr[substr[substr.find(':'):].find(':')+1
+			# print self.session.files
+			# help(self.session)
+			# 2018-11-02,1073.729980,1082.974976,1054.609985,1057.790039,1057.790039,1838200
+			
+
+			# 2018-11-02,1073.7300,1082.9700,1054.6100,1057.7900,1839043
+
+			
+			
+			
+			
 
 	def run(self):
-		self.data, self.meta = self.ts.get_daily(symbol=self.symbol, outputsize='full')#, interval='1min')
+		self.session = requests.Session()
+		# self.data, self.meta = self.ts.get_daily(symbol=self.symbol, outputsize='full')#, interval='1min')
+		crumbFile =  self.session.get("https://finance.yahoo.com/quote/"+self.symbol+"?p="+self.symbol)
+		if crumbFile.ok:
+			if "CrumbStore" in crumbFile.text:
+				substr = crumbFile.text[crumbFile.text.find("\"CrumbStore"):crumbFile.text[crumbFile.text.find("CrumbStore"):].find(',')+crumbFile.text.find("CrumbStore")]
+				substr = '{' + substr + '}'
+				j = json.loads(substr)
+				# print j["CrumbStore"]["crumb"]
+				self.data = self.session.get("https://query1.finance.yahoo.com/v7/finance/download/"+self.symbol+"?period1=0000000000&period2=" + str(int(time.time())) + "&interval=1d&events=history&crumb="+j["CrumbStore"]["crumb"])
+				try:
+					self.optionData = urllib2.urlopen(optionURL + self.symbol)
+					self.success = True
+				except urllib2.HTTPError:
+					print optionURL + self.symbol + " URL Not Found"
+
 		if self.success:
 			with open(optionPath + self.symbol + '.csv', 'w') as optionFile:
 				rawOptionData = ""
@@ -70,13 +102,18 @@ class Stock(threading.Thread):
 						print optionURL + self.symbol + " URL Not Found" + "?date=" + str(date)
 						return
 
-				with open(stock_path + self.symbol + ".csv", 'w') as file:
-					writer = csv.writer(file)
-					print "Writing AV Buffer"
-					for row in self.data:
-						writer.writerow(row)
-					os.system("tail -n +2 " + stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
-					os.system(executable_path + "calc " + self.symbol)
+				with open(proc_path + self.symbol + ".csv", 'w') as file:
+				# 	reader = csv.DictReader(self.data.text)
+				# 	writer = csv.writer(file)
+				# 	print "Writing AV Buffer"
+				# 	for row in reader:
+				# 		writer.writerow(row[])
+					readin = pandas.read_csv(io.StringIO(self.data.text), header=0)
+					readin.drop(columns=['Adj Close'])
+					file.write(readin.to_csv(header=False, index=False))
+					# os.system("tail -n +2 " + stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
+					# os.system("cat "+ stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
+				os.system(executable_path + "calc " + self.symbol)
 			
 			
 		# print self.symbol
@@ -123,13 +160,13 @@ def main():
 	threads = []
 
 	for stock in symbols:
-		start = time.time()
+		start = datetime.now()
 		print stock
 		threads.append(Stock(stock))
 		threads[-1].start()
 		# break
 		while(True):
-			if(time.time() - start >= 4):
+			if((datetime.now() - start).microseconds >= 500000):
 				break
 		# time.sleep(4) #required to avoid >15 calls per minute to Alpha Vantage
 
