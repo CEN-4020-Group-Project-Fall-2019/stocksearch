@@ -365,7 +365,7 @@ int main(int argc, char** argv) {
 	// 	cout<<"Context initialized"<<endl;
 	// }
 	vector<char*>* symbols = new vector<char*>();
-	
+
 	if(argc <= 1)
 		listDir("./proc", symbols);
 	else{
@@ -873,11 +873,16 @@ void AVData::tokenize(){
 			if(!this->eof()){
 				// cout<<filename<<endl;
 				// cout<<(*tokenized)[1]<<endl;
-				open.push_back(stod((*tokenized)[1]));
-				high.push_back(stod((*tokenized)[2]));
-				low.push_back(stod((*tokenized)[3]));
-				close.push_back(stod((*tokenized)[4]));
-				volume.push_back(stod((*tokenized)[5]));
+				if(strcmp((*tokenized)[1], "") != 0)
+					open.push_back(stod((*tokenized)[1]));
+				if(strcmp((*tokenized)[2], "") != 0)
+					high.push_back(stod((*tokenized)[2]));
+				if(strcmp((*tokenized)[3], "") != 0)
+					low.push_back(stod((*tokenized)[3]));
+				if(strcmp((*tokenized)[4], "") != 0)
+					close.push_back(stod((*tokenized)[4]));
+				if(strcmp((*tokenized)[5], "") != 0)
+					volume.push_back(stod((*tokenized)[5]));
 			}
 			else break;
 		}
