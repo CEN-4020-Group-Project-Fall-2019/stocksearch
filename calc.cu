@@ -365,11 +365,22 @@ int main(int argc, char** argv) {
 	// 	cout<<"Context initialized"<<endl;
 	// }
 	vector<char*>* symbols = new vector<char*>();
-	listDir("./proc", symbols);
+	if(argc <= 1)
+		listDir("./proc", symbols);
+	else{
+		for (int i = 1; i < argc; i++){
+			char* temp = new char[strlen(argv[i])+5];
+			strcpy(temp, argv[i]);
+			cout<<"Reading "<<temp<<endl;
+			addStrToVec(strcat(temp,".csv"), symbols);
+			delete [] temp;
+		}
+
+	}
 	vector<AVData*> dataList = vector<AVData*>();
 	vector<OptionData*> optionList = vector<OptionData*>();
 
-	for(int i = 2; i < symbols->size(); i++){
+	for(int i = 0; i < symbols->size(); i++){
 		char* dirName = new char[100];
 		strcpy(dirName, "./proc/");
 		// cout<<(*symbols)[i]<<endl;
@@ -873,13 +884,17 @@ void AVData::tokenize(){
 
 AVData::AVData(char* fn) : CSVReader(fn){}
 
+void addStrToVec(char* str, vector<char*>* v){
+	char* temp = new char[strlen(str)+1];
+	memcpy(temp, str, strlen(str)+1);
+	v->push_back(temp);
+}
+
 void listDir(char* dirPath, vector<char*>* v){
 	DIR* dirp = opendir(dirPath);
 	struct dirent * dp;
-	while((dp = readdir(dirp)) != NULL){
-		char* temp = new char[strlen(dp->d_name)+1];
-		memcpy(temp, dp->d_name, strlen(dp->d_name)+1);
-		v->push_back(temp);
+	for(int i = 0; (dp = readdir(dirp)) != NULL; i++){
+		if(i >= 2) addStrToVec(dp->d_name, v);
 		// cout<<temp<<endl;
 	}
 	closedir(dirp);
@@ -916,8 +931,8 @@ bool* OptionData::comparePrices(double* optionPrices){
 	bool* temp = new bool[ask.size()];
 	for(int i = 0; i < ask.size(); i++){
 		temp[i] = optionPrices[i] < ask[i];
-		if(call[i])
-			printf("%f %f %f %f\n", exp[i], strike[i], optionPrices[i], ask[i]);
+		if(call[i] && temp[i])
+			printf("%s %f %f %f %f %f\n", this->fileName(), exp[i], strike[i], optionPrices[i], ask[i], bid[i]);
 	}
 	return temp;
 }

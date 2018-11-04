@@ -21,8 +21,8 @@ class Stock(threading.Thread):
 	def __init__(self, symbol):
 		super(Stock, self).__init__()
 		self.symbol = symbol
-		# self.ts = av(key='EZR9O8KQ47UHIL9G', output_format='csv')
-		self.ts = av(key='AJ3OQA9ZGO0LM923', output_format='csv')
+		self.ts = av(key='PRP85LL7AYYVHTZD', output_format='csv')
+		# self.ts = av(key='AJ3OQA9ZGO0LM923', output_format='csv')
 		
 		self.success = True
 		try:
@@ -69,6 +69,7 @@ class Stock(threading.Thread):
 					except urllib2.HTTPError:
 						print optionURL + self.symbol + " URL Not Found" + "?date=" + str(date)
 						return
+
 				with open(stock_path + self.symbol + ".csv", 'w') as file:
 					writer = csv.writer(file)
 					print "Writing AV Buffer"
@@ -113,14 +114,14 @@ def main():
 	threads = []
 
 	for stock in symbols:
-		# start = time.time()
+		start = time.time()
 		print stock
 		threads.append(Stock(stock))
 		threads[-1].start()
 		# break
-		# while(True):
-		# 	if(time.time() - start >= 4):
-		# 		break
+		while(True):
+			if(time.time() - start >= 4):
+				break
 		# time.sleep(4) #required to avoid >15 calls per minute to Alpha Vantage
 
 	for thread in threads:

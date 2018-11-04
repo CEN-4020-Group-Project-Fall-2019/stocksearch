@@ -60,3 +60,5 @@ public:
 	vector<double> ask;
 	vector<double> impVol;
 };
+
+void addStrToVec(char*, vector<char*>*);
