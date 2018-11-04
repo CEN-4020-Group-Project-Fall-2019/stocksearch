@@ -159,7 +159,7 @@ def main():
 
 	for stock in symbols:
 		start = datetime.now()
-		# print stock
+		print stock
 		thread = Stock(stock)
 		thread.start()
 		threads.append(thread)
