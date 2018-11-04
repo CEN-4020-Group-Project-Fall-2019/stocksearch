@@ -76,6 +76,7 @@ class Stock(threading.Thread):
 					for row in self.data:
 						writer.writerow(row)
 					os.system("tail -n +2 " + stock_path + self.symbol + ".csv | tac > " + proc_path + self.symbol + ".csv")
+					os.system(executable_path + "calc " + self.symbol)
 			
 			
 		# print self.symbol
@@ -103,12 +104,20 @@ def main():
 	# exchanges.append(Exch("nyse"))
 	# exchanges.append(Exch("amex"))
 	symbols = []
-	for item in exchanges:
-			with open(item.filepath, 'r') as file:
-				reader = csv.DictReader(file)
-				for row in reader:
-					if row['Symbol'] not in symbols and " " not in row['Symbol']:
-						symbols.append(row['Symbol'])
+	if len(sys.argv) < 2:
+		for item in exchanges:
+				with open(item.filepath, 'r') as file:
+					reader = csv.DictReader(file)
+					for row in reader:
+						if row['Symbol'] not in symbols and " " not in row['Symbol']:
+							symbols.append(row['Symbol'])
+	else:
+		count = 0
+		for item in sys.argv:
+			if count > 0:
+				print "Working on " + item
+				symbols.append(item)
+			count = count+1
 	# symbols = ["AABA"]
 
 	threads = []
@@ -127,7 +136,7 @@ def main():
 	for thread in threads:
 		thread.join()
 
-	os.system(executable_path + "calc")
+	# os.system(executable_path + "calc")
 
 if __name__ == '__main__':
 	main()
