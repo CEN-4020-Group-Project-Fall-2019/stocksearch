@@ -15,6 +15,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 __global__ void movingAvg(int n, int numDays, double* in, double* out){
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	
 	if(i<n){
 		out[i] = 0;
 		
@@ -29,6 +30,7 @@ __global__ void movingAvg(int n, int numDays, double* in, double* out){
 
 __global__ void deltas(int n, double* in, double* out){
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	
 	if(i<n){
 		if(i==0) out[i] = 0;
 		else{
@@ -39,19 +41,24 @@ __global__ void deltas(int n, double* in, double* out){
 
 __global__ void stdDev(int n, int period, double* x, double* std){
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	
 	if(i <= period){
 		std[i] = 0;
 	}
+	
 	if(i < n && i > period){
 		double average = 0;
 		for(int j = i-period+1; j <= i; j++){
 			average += x[j];
 		}
+		
 		average /= period;
 		double deviation = 0;
+		
 		for(int j = i-period+1; j <= i; j++){
 			deviation += (x[j] - average) * (x[j] - average);
 		}
+		
 		deviation /= period;
 		std[i] = __dsqrt_rn(deviation);
 	}
@@ -59,6 +66,7 @@ __global__ void stdDev(int n, int period, double* x, double* std){
 
 __global__ void normalize(int* n, double* ave, double* in){
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	
 	if(i == *n){
 		*ave = 0;
 		for(int j = 0; j < *n; j++){
@@ -66,9 +74,9 @@ __global__ void normalize(int* n, double* ave, double* in){
 		}
 		(*ave) = (*ave) / *n;
 	}
-
+	
 	__syncthreads();
-
+	
 	if(i < *n){
 		in[i] /= (*ave);
 	}
@@ -127,8 +135,6 @@ double* calcPearson(int nx, double* x, int* xDates, int ny, double* y, int* yDat
 
 	double* d_numerator, *d_Xden, *d_Yden;
 
-	
-
 	if(nx > ny){
 		gpuErrchk(cudaMalloc((void**)&d_numerator, nx*sizeof(double)));
 		gpuErrchk(cudaMalloc((void**)&d_Xden, nx*sizeof(double)));
@@ -158,6 +164,7 @@ int parseDate(char* date){
 	char* year, *month, *day;
 	bool first = false;
 	year = date;
+	
 	for(int i = 0; date[i] != '\0'; i++){
 		if(date[i] == '-'){
 			date[i] = '\0';
@@ -177,8 +184,10 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 	int i = blockIdx.x*blockDim.x+threadIdx.x;
 	double R = 1.0202;
 	__shared__ double deviation;
+	
 	if(threadIdx.x == 0){
 		double average = 0;
+		
 		for(int j = 0; j <= numDays; j++){
 			average += stockPrices[j];
 		}
@@ -212,7 +221,8 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 	
 }
 __global__ void launch(double** prices, int* sizes, int n, int* status, double** optionPrices, double** strikes, double** exp, bool** calls, int* numOptions){
-	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	int i = blockIdx.x*blockDim.x+threadIdx.x; //there might be an issue with launching like this for single or cmdline symbols as this might restrict number of threads launched, I really don't know what the limitations of it are
+	
 	if(i < n){
 		printf("in kernel %d\n", sizes[i]);
 		if(sizes[i] > 10){
@@ -228,23 +238,25 @@ __global__ void launch(double** prices, int* sizes, int n, int* status, double**
 			std = new double[sizes[i]];
 			double* ave = new double;
 			cudaDeviceSynchronize();
-			movingAvg<<<blocks, threads>>>(sizes[i], 10, prices[i], five);
+
+			movingAvg<<<blocks, threads>>>(sizes[i], 10, prices[i], five); //calc moving average over 10 days for entire data present for this thread's symbol
 			cudaDeviceSynchronize();
-			movingAvg<<<blocks, threads>>>(sizes[i], 20, prices[i], ten);
+			movingAvg<<<blocks, threads>>>(sizes[i], 20, prices[i], ten); //20 day mvg avg
 			cudaDeviceSynchronize();
-			deltas<<<blocks, threads>>>(sizes[i], prices[i], d1);
+			deltas<<<blocks, threads>>>(sizes[i], prices[i], d1); //differences between every day of data for symbol
 			cudaDeviceSynchronize();
-			deltas<<<blocks, threads>>>(sizes[i], five, d5);
+			deltas<<<blocks, threads>>>(sizes[i], five, d5);	//5 day differences, which is really ten day because of setting above. I never changed the array name
 			cudaDeviceSynchronize();
-			deltas<<<blocks, threads>>>(sizes[i], ten, d10);
+			deltas<<<blocks, threads>>>(sizes[i], ten, d10);	//20 day difference
 			cudaDeviceSynchronize();
-			deltas<<<blocks, threads>>>(sizes[i], d5, d2_5);
+			deltas<<<blocks, threads>>>(sizes[i], d5, d2_5);	//d^2 of 10 day, difference of 10 day differences
 			cudaDeviceSynchronize();
-			deltas<<<blocks, threads>>>(sizes[i], d10, d2_10);
+			deltas<<<blocks, threads>>>(sizes[i], d10, d2_10);	//d^2 of 20 day
 			cudaDeviceSynchronize();
-			stdDev<<<blocks, threads>>>(sizes[i], 20, prices[i], std);
+			stdDev<<<blocks, threads>>>(sizes[i], 20, prices[i], std); //standard deviation of previous 20 days for every day in existence (rolling std avg of symbol data)
 			cudaDeviceSynchronize();
-			if(sizes[i] >= 253){
+			
+			if(sizes[i] >= 253){//if more than a year of data, calculate options data given volatility and prices of options
 				optionPrice<<<numOptions[i]/512+1, 512>>>(&(prices[i][sizes[i]-253]), 252, strikes[i], exp[i], calls[i], optionPrices[i], numOptions[i]);
 			}			
 			else{
@@ -255,16 +267,18 @@ __global__ void launch(double** prices, int* sizes, int n, int* status, double**
 			normalize<<<blocks, threads>>>(&sizes[i], ave, std);
 			status[i] = 0;
 			int index = sizes[i]-1;
-			if((d10[index] < 0.02 || d10[index] > -0.02) && d2_5[index] > 0 && d5[index] > 0 && std[index] < 2){
-				status[i] = 1;
+			
+			if((d10[index] < 0.02 || d10[index] > -0.02) && d2_5[index] > 0 && d5[index] > 0 && std[index] < 2){//if the change in 20 day around 0 and change in 10 day change > 0 and stdev isn't some psychotic amount
+				status[i] = 1;	//go long!
 			}
-			else if( ((d2_5[index] < 0 && (zero(d5[index]) || d5[index] < -0.002)) ) || (d2_10[index] < 0 && (zero(d10[index] || d10[index] < -.002))) ) {
-				status[i] = 2;
+			else if( ((d2_5[index] < 0 && (zero(d5[index]) || d5[index] < -0.002)) ) || (d2_10[index] < 0 && (zero(d10[index]) || d10[index] < -.002)) ) {
+				status[i] = 2;	//short that
 			}
 			else if(prices[i][index-1] < five[index-1] && prices[i][index] > five[index] && std[index] > 1){
-				status[i] = 2;
+				status[i] = 2;	//short that
 			}
 			cudaDeviceSynchronize();
+
 			delete[] ten;
 			delete[] five;
 			delete[] d1;
@@ -405,11 +419,13 @@ int main(int argc, char** argv) {
 	cudaMemcpy(status, d_status, dataList.size()*sizeof(int), cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();
 	cout<<"-------------------Long-------------------\n";
+	
 	for(int i = 0; i < dataList.size(); i++){
 		if(status[i] == 1)
 			cout<<dataList[i]->fileName()<<endl;
 	}
 	cout<<"-------------------Short-------------------\n";
+	
 	for(int i = 0; i < dataList.size(); i++){
 		if(status[i] == 2)
 			cout<<dataList[i]->fileName()<<endl;
