@@ -1,5 +1,4 @@
 #!/usr/bin/env python2
-from alpha_vantage.timeseries import TimeSeries as av
 import threading
 import csv
 import time
