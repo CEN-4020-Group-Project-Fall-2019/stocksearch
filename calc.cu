@@ -220,7 +220,7 @@ __global__ void optionPrice(double* stockPrices, int numDays, double* strikes, d
 
 	
 }
-__global__ void launch(double** prices, int* sizes, int n, int* status, double** optionPrices, double** strikes, double** exp, bool** calls, int* numOptions){
+__global__ void launch(double** prices, int* sizes, int n, int* status, double** optionPrices, double** strikes, double** exp, bool** calls, int* numOptions){ //rewrite to avoid calling kernels from kernels
 	int i = blockIdx.x*blockDim.x+threadIdx.x; //there might be an issue with launching like this for single or cmdline symbols as this might restrict number of threads launched, I really don't know what the limitations of it are
 	
 	if(i < n){

@@ -12,6 +12,7 @@ import pandas
 import io
 from datetime import datetime
 import resource
+import h5py		#should switch from csv to hdf5 implementation, would allow for faster upload to processing/updating of computed data
 
 resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
 
