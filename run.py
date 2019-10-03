@@ -13,6 +13,7 @@ import io
 from datetime import datetime
 import resource
 import h5py		#should switch from csv to hdf5 implementation, would allow for faster upload to processing/updating of computed data
+import xml.etree.ElementTree as ET
 
 resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
 
@@ -93,33 +94,43 @@ class Exch():
 		self.file.close()
 
 def main(): #need to get list of every symbol in nasdaq
-	exchanges = []
-	exchanges.append(Exch("nasdaq"))
-	symbols = []
-	if len(sys.argv) < 2:
-		for item in exchanges:
-				with open(item.filepath, 'r') as file:
-					reader = csv.DictReader(file)
-					for row in reader:
-						if row['Symbol'] not in symbols and " " not in row['Symbol']:
-							symbols.append(row['Symbol'])
-	else:
-		count = 0
-		for item in sys.argv:
-			if count > 0:
-				symbols.append(item)
-			count = count+1
+	treasurylink = urllib2.urlopen("https://www.treasury.gov/resource-center/data-chart-center/interest-rates/Datasets/yield.xml")
+	with open("treasury.xml", "wb") as file:
+		while True:
+			buf = treasurylink.read(block)
+			if not buf:
+				break
+			file.write(buf)
+		tree = ET.parse("treasury.xml")
+		root = tree.getroot()
+		print(root[0][0][1][0][2][0][4].text)
+	# exchanges = []
+	# exchanges.append(Exch("nasdaq"))
+	# symbols = []
+	# if len(sys.argv) < 2:
+	# 	for item in exchanges:
+	# 			with open(item.filepath, 'r') as file:
+	# 				reader = csv.DictReader(file)
+	# 				for row in reader:
+	# 					if row['Symbol'] not in symbols and " " not in row['Symbol']:
+	# 						symbols.append(row['Symbol'])
+	# else:
+	# 	count = 0
+	# 	for item in sys.argv:
+	# 		if count > 0:
+	# 			symbols.append(item)
+	# 		count = count+1
 
-	threads = []
-	for stock in symbols:
-		start = datetime.now()
-		print(stock)
-		thread = Stock(stock)
-		thread.start()
-		threads.append(thread)
+	# threads = []
+	# for stock in symbols:
+	# 	start = datetime.now()
+	# 	print(stock)
+	# 	thread = Stock(stock)
+	# 	thread.start()
+	# 	threads.append(thread)
 
-	for thread in threads:
-		thread.join()
+	# for thread in threads:
+	# 	thread.join()
 
 if __name__ == '__main__':
 	main()

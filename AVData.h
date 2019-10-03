@@ -1,6 +1,8 @@
 #ifndef AVDATA_H
 #define AVDATA_H
 
+//designed to read from alphavantage, need to update for yahoo info
+
 #include "CSVReader.h"
 class AVData : public CSVReader{
 public:

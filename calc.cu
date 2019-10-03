@@ -454,9 +454,6 @@ __device__ bool zero(double in){
 	return false;
 }
 
-
-
-
 void addStrToVec(char* str, vector<char*>* v){
 	char* temp = new char[strlen(str)+1];
 	memcpy(temp, str, strlen(str)+1);
@@ -471,5 +468,3 @@ void listDir(char* dirPath, vector<char*>* v){
 	}
 	closedir(dirp);
 }
-
-
