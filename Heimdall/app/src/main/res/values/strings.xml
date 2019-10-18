@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Heimdall</string>
+    <string name="sign_in">Sign in</string>
+    <string name="home">Home</string>
+    <string name="registration">Register to use Heimdall</string>
+    <string name="forgotpass">Reset your password</string>
+    <string name="addCard">Add a card</string>
+    <string name="addTwitter">Add a Twitter</string>
+    <string name="cardInfo">Card info</string>
+    <string name="settings">Settings</string>
+    <string name="recommendations">Card Recommendations</string>
+    <string name="signint1"><u>Register an account</u></string>
+    <string name="signint2"><u>Reset your password</u></string>
+</resources>
