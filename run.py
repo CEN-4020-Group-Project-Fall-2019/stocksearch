@@ -95,6 +95,7 @@ class Exch():
 
 def main(): #need to get list of every symbol in nasdaq
 	treasurylink = urllib2.urlopen("https://www.treasury.gov/resource-center/data-chart-center/interest-rates/Datasets/yield.xml")
+	treasuryrate = 0.0
 	with open("treasury.xml", "wb") as file:
 		while True:
 			buf = treasurylink.read(block)
@@ -103,34 +104,34 @@ def main(): #need to get list of every symbol in nasdaq
 			file.write(buf)
 		tree = ET.parse("treasury.xml")
 		root = tree.getroot()
-		print(root[0][0][1][0][2][0][4].text)
-	# exchanges = []
-	# exchanges.append(Exch("nasdaq"))
-	# symbols = []
-	# if len(sys.argv) < 2:
-	# 	for item in exchanges:
-	# 			with open(item.filepath, 'r') as file:
-	# 				reader = csv.DictReader(file)
-	# 				for row in reader:
-	# 					if row['Symbol'] not in symbols and " " not in row['Symbol']:
-	# 						symbols.append(row['Symbol'])
-	# else:
-	# 	count = 0
-	# 	for item in sys.argv:
-	# 		if count > 0:
-	# 			symbols.append(item)
-	# 		count = count+1
+		treasuryRate = float(root[0][0][1][0][2][0][4].text)
+	exchanges = []
+	exchanges.append(Exch("nasdaq"))
+	symbols = []
+	if len(sys.argv) < 2:
+		for item in exchanges:
+				with open(item.filepath, 'r') as file:
+					reader = csv.DictReader(file)
+					for row in reader:
+						if row['Symbol'] not in symbols and " " not in row['Symbol']:
+							symbols.append(row['Symbol'])
+	else:
+		count = 0
+		for item in sys.argv:
+			if count > 0:
+				symbols.append(item)
+			count = count+1
 
-	# threads = []
-	# for stock in symbols:
-	# 	start = datetime.now()
-	# 	print(stock)
-	# 	thread = Stock(stock)
-	# 	thread.start()
-	# 	threads.append(thread)
+	threads = []
+	for stock in symbols:
+		start = datetime.now()
+		print(stock)
+		thread = Stock(stock)
+		thread.start()
+		threads.append(thread)
 
-	# for thread in threads:
-	# 	thread.join()
+	for thread in threads:
+		thread.join()
 
 if __name__ == '__main__':
 	main()
