@@ -130,7 +130,7 @@ def main(): #need to get list of every symbol in nasdaq
 		thread = Stock(stock)
 		thread.start()
 		threads.append(thread)
-		if len(threads) == 10:
+		if len(threads) == 16:
 			for t in threads:
 				t.join()
 			threads = []
