@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from gevent import monkey
+monkey.patch_all()
 import threading
 import csv
 import time
@@ -12,8 +14,18 @@ import pandas
 import io
 from datetime import datetime
 import resource
-import h5py		#should switch from csv to hdf5 implementation, would allow for faster upload to processing/updating of computed data
 import xml.etree.ElementTree as ET
+import pyrebase as base
+
+config = {
+	"apiKey": "AIzaSyD5nvLGP014aCjjP-wNe_uwZo3orlLiG9Q",
+	"authDomain": "heimdallcen4020.firebaseapp.com",
+	"databaseURL": "https://heimdallcen4020.firebaseio.com",
+	"storageBucket": "heimdallcen4020.appspot.com"
+}
+
+firebase = base.initialize_app(config)
+db = firebase.database()
 
 resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
 
@@ -40,44 +52,34 @@ class Stock(threading.Thread):
 				substr = crumbFile.text[crumbFile.text.find("\"CrumbStore"):crumbFile.text[crumbFile.text.find("CrumbStore"):].find(',')+crumbFile.text.find("CrumbStore")]
 				substr = '{' + substr + '}'
 				j = json.loads(substr)
-				self.data = self.session.get("https://query1.finance.yahoo.com/v7/finance/download/"+self.symbol+"?period1=0000000000&period2=" + str(int(time.time())) + "&interval=1d&events=history&crumb="+j["CrumbStore"]["crumb"])
+				self.data = self.session.get("https://query1.finance.yahoo.com/v8/finance/chart/"+self.symbol+"?interval=1m&crumb="+j["CrumbStore"]["crumb"])
 				options = self.session.get(optionURL + self.symbol)
 				if options.ok:
 					self.optionData = options.text
 					self.success = True
 				else:
 					print(optionURL, self.symbol, " URL Not Found")
-
 		if self.success:
 			print("Starting ", self.symbol)
-			with open(optionPath + self.symbol + '.csv', 'w') as optionFile:
-				procOptionData = json.loads(self.optionData)
-				for date in procOptionData['optionChain']['result'][0]['expirationDates']:
-					curOptionGet = self.session.get(optionURL + self.symbol + "?date=" + str(date))
-					if curOptionGet.ok:
-						curOptionData = curOptionGet.text
-						processed = json.loads(curOptionData)
-						for item in processed['optionChain']['result'][0]['options'][0]['puts']:	#issue with ootm options not having bid/ask (makes sense)
-							if 'bid' in item.keys():
-								optionFile.write("P" + ',' + str(date) + ',' + str(item['strike']) + "," + str(item['bid']) + "," + str(item['ask']) + "," + str(item["impliedVolatility"])+'\n')
-							else:
-								optionFile.write("P" + ',' + str(date) + ',' + str(item['strike']) + ',' + str(item["impliedVolatility"]) + '\n')
-						for item in processed['optionChain']['result'][0]['options'][0]['calls']:
-							if 'bid' in item.keys():
-								optionFile.write("C" + ',' + str(date) + ',' + str(item['strike']) + "," + str(item['bid']) + "," + str(item['ask']) + "," + str(item["impliedVolatility"])+'\n')
-							else:
-								optionFile.write("C" + ',' + str(date) + ',' + str(item['strike']) + ',' + str(item["impliedVolatility"]) + '\n')
-
-					else:
-						print(optionURL, self.symbol, " URL Not Found", "?date=", str(date))
-						return
-
-				with open(proc_path + self.symbol + ".csv", 'w') as file:
-					readin = pandas.read_csv(io.StringIO(self.data.text), header=0)
-					readin.drop(columns=['Adj Close'])
-					file.write(readin.to_csv(header=False, index=False))
-#				os.system(executable_path + "calc " + self.symbol)
-		
+			procOptionData = json.loads(self.optionData)
+			for date in procOptionData['optionChain']['result'][0]['expirationDates']:
+				curOptionGet = self.session.get(optionURL + self.symbol + "?date=" + str(date))
+				if curOptionGet.ok:
+					curOptionData = curOptionGet.text
+					processed = json.loads(curOptionData)
+					for item in processed['optionChain']['result'][0]['options'][0]['puts']:	#issue with ootm options not having bid/ask (makes sense)
+						db.child("puts").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
+					for item in processed['optionChain']['result'][0]['options'][0]['calls']:
+						db.child("calls").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
+				else:
+					print(optionURL, self.symbol, " URL Not Found", "?date=", str(date))
+					return
+			# readin = pandas.read_csv(io.StringIO(self.data.text), header=0)
+			# readin.drop(columns=['Adj Close'])
+			# print(self.data.text)
+			# print(json.loads(readin.to_json()))
+			db.child("stocks").child(self.symbol).set(json.loads(self.data.text)["chart"]["result"][0])
+	
 class Exch():
 	def __init__(self, exchange):
 		self.exchange = exchange
@@ -90,7 +92,6 @@ class Exch():
 			if not buf:
 				break
 			self.file.write(buf)
-
 		self.file.close()
 
 def main(): #need to get list of every symbol in nasdaq
@@ -129,9 +130,10 @@ def main(): #need to get list of every symbol in nasdaq
 		thread = Stock(stock)
 		thread.start()
 		threads.append(thread)
-
-	for thread in threads:
-		thread.join()
+		if len(threads) == 10:
+			for t in threads:
+				t.join()
+			threads = []
 
 if __name__ == '__main__':
 	main()
