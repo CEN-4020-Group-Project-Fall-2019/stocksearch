@@ -3,20 +3,19 @@ from gevent import monkey
 monkey.patch_all()
 import threading
 import csv
-import time
 import urllib.request as urllib2
 import os
 import sys
 import json
 import grequests as requests
-import pickle
-import pandas
-import numpy
 import io
 from datetime import datetime
 import resource
 import xml.etree.ElementTree as ET
 import pyrebase as base
+import copy
+import mysql.connector as sql
+import numpy
 
 config = {
 	"apiKey": "AIzaSyD5nvLGP014aCjjP-wNe_uwZo3orlLiG9Q",
@@ -28,7 +27,7 @@ config = {
 firebase = base.initialize_app(config)
 db = firebase.database()
 
-resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
+# resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
 executable_path = os.getcwd() 
 exchange_path = executable_path + "/exchanges/"
 stock_path = executable_path + "/data/"
@@ -36,13 +35,79 @@ proc_path = executable_path + "/proc/"
 optionPath = executable_path + "/options/"
 block = 32768
 optionURL = "https://query1.finance.yahoo.com/v7/finance/options/"
-
 class Stock(threading.Thread):
-	def __init__(self, symbol):
+	def __init__(self, symbol, tRate):
 		super(Stock, self).__init__()
 		self.success = False
 		self.symbol = symbol
 		self.session = requests.Session()
+		# self.db = sql.connect(host='database-1.cedqzlba2fep.us-east-1.rds.amazonaws.com', port=3306, user='pi', passwd='password')
+		# self.cx = self.db.cursor()
+		self.R = tRate
+
+	def preProcPriceData(self):
+		priceData = self.stockData['indicators']['quote'][0]
+		self.processedPriceData = {}
+		count = 0
+		if 'timestamp' in self.stockData.keys():
+			for i in self.stockData['timestamp']:
+				if not priceData['close'][count] == None and not priceData['open'] == None and not priceData['volume'] == None:
+					self.processedPriceData[i] = {}
+					self.processedPriceData[i]['close'] = priceData['close'][count]
+					self.processedPriceData[i]['open'] = priceData['open'][count]
+					self.processedPriceData[i]['volume'] = priceData['volume'][count]
+				count += 1
+		self.stockData = None
+	def getSBSPrices(self, per='close'):
+		self.prices = []
+		self.times = []
+		times = [int(t) for t in list(self.processedPriceData.keys())]
+		prices = [float(t[per]) for t in list(self.processedPriceData.values())]
+		if times:
+			startTime = times[0]
+			endTime = times[-1]
+			prevPrice = prices[0]
+			curIndex = 0
+			curTime = startTime
+			while curTime < endTime:
+				while times[curIndex] < curTime:
+					curIndex += 1
+				dt = times[curIndex] - times[curIndex-1]
+				dp = prices[curIndex] - prices[curIndex-1]
+				dpodt = dp/dt
+				self.prices.append(prices[curIndex-1] + (curTime-times[curIndex-1]*dpodt))
+				self.times.append(curTime)
+				curTime += 1
+			
+	def sma(self, period=15, per="close"):
+		integ = []
+		for i in range(len(self.prices)-period):
+			integ.append(numpy.average(self.prices[i:i+period]))
+		return {'p': integ, 't': self.times[period:]}
+
+	def stdev(self, period=15, per="close"):
+		var = []
+		for i in range(len(self.prices)-period):
+			var.append(numpy.std(self.prices[i:i+period]))
+		return {'v': var, 't': self.times[period:]}
+
+	def options(self, period=300):
+		st = stdev(period=period)
+		oPrices = []
+		for i in self.calls:
+			diff = self.prices[-1]*st['v'][-1]*(i[0]-st['t'][-1])
+			pU = self.prices[-1] + diff
+			pD = self.prices[-1] - diff
+			if pD < 0:
+				pd = 0
+			mU = pU - i[1]
+			mD = pD - i[1]
+			mD = min(0, mD)
+			mU = min(0, mU)
+			valP = (mU-mD)/(pU-pD)
+			p = self.prices[-1]*valP + ((mU - (pU*valP))*exp(self.R*(i[0] - st['t'][-1])))
+			oPrices.append((i[0], i[1], p))
+		return oPrices
 
 	def run(self):
 		crumbFile =  self.session.get("https://finance.yahoo.com/quote/"+self.symbol+"?p="+self.symbol)
@@ -67,18 +132,25 @@ class Stock(threading.Thread):
 				if curOptionGet.ok:
 					curOptionData = curOptionGet.text
 					processed = json.loads(curOptionData)
-					for item in processed['optionChain']['result'][0]['options'][0]['puts']:	#issue with ootm options not having bid/ask (makes sense)
-						db.child("puts").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
+					self.puts = []
+					self.calls = []
+					for item in processed['optionChain']['result'][0]['options'][0]['puts']:
+						self.puts.append((item['expiration'], item['strike'], item['lastPrice']))
+						# db.child("puts").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
 					for item in processed['optionChain']['result'][0]['options'][0]['calls']:
-						db.child("calls").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
+						# db.child("calls").child(self.symbol).child(str(int(float(item["strike"])*100))).child(str(item["expiration"])).set(item)
+						self.calls.append((item['expiration'], item['strike'], item['lastPrice']))
 				else:
 					print(optionURL, self.symbol, " URL Not Found", "?date=", str(date))
 					return
-			# readin = pandas.read_csv(io.StringIO(self.data.text), header=0)
-			# readin.drop(columns=['Adj Close'])
-			# print(self.data.text)
-			# print(json.loads(readin.to_json()))
-			db.child("stocks").child(self.symbol).set(json.loads(self.data.text)["chart"]["result"][0])
+			self.stockData = json.loads(self.data.text)["chart"]["result"][0]
+			# db.child("stocks").child(self.symbol).set(json.loads(self.data.text)["chart"]["result"][0])
+			self.preProcPriceData()
+			self.getSBSPrices()
+			fiveSMA = self.sma(period=5)
+			sixtySMA = self.sma(period=60)
+			# db.child("stocks").child(self.symbol).child("5s").set(fiveSMA)
+			# db.child("stocks").child(self.symbol).child("1m").set(sixtySMA)
 	
 class Exch():
 	def __init__(self, exchange):
@@ -127,7 +199,7 @@ def main(): #need to get list of every symbol in nasdaq
 	for stock in symbols:
 		start = datetime.now()
 		print(stock)
-		thread = Stock(stock)
+		thread = Stock(stock, treasuryRate)
 		thread.start()
 		threads.append(thread)
 		if len(threads) == 16:
