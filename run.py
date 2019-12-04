@@ -17,6 +17,15 @@ import copy
 import mysql.connector as sql
 import numpy
 
+import twitter
+import time
+import argparse
+
+from google.cloud import language
+from google.cloud.language import enums
+from google.cloud.language import types
+
+
 config = {
 	"apiKey": "AIzaSyD5nvLGP014aCjjP-wNe_uwZo3orlLiG9Q",
 	"authDomain": "heimdallcen4020.firebaseapp.com",
@@ -26,7 +35,7 @@ config = {
 
 firebase = base.initialize_app(config)
 db = firebase.database()
-
+api = twitter.Api(consumer_key= 'Z4HlCdEhEJk8SlLHzsZDx9fxw', consumer_secret='xLM61gbcSy3InKE7QCVfhZHDstYaPBJNdMBTBC9cfl11BgM27X' , access_token_key='977249287-f4r7WLtpa15LaxsXNOsNk7fT8pGc0NHchC5vzPl1', access_token_secret='aAMDaG7OcdqbebajEYSXDcTAbTimlLnV9InRdUpkFqP0U')
 # resource.setrlimit(resource.RLIMIT_NOFILE, (110000, 110000))
 executable_path = os.getcwd() 
 exchange_path = executable_path + "/exchanges/"
@@ -58,6 +67,7 @@ class Stock(threading.Thread):
 					self.processedPriceData[i]['volume'] = priceData['volume'][count]
 				count += 1
 		self.stockData = None
+		
 	def getSBSPrices(self, per='close'):
 		self.prices = []
 		self.times = []
@@ -110,6 +120,11 @@ class Stock(threading.Thread):
 		return oPrices
 
 	def run(self):
+		# client = language.LanguageServiceClient()
+		# searchResults = api.GetSearch(term=self.symbol, include_entities=True)
+		# scores = [client.analyze_sentiment(document=types.Document(content=s.text, type=enums.Document.Type.PLAIN_TEXT)) for s in searchResults]
+		# self.sentiment = numpy.average([s.document_sentiment.score for s in scores])
+		# self.magnitude = numpy.average([s.document_sentiment.magnitude for s in scores])
 		crumbFile =  self.session.get("https://finance.yahoo.com/quote/"+self.symbol+"?p="+self.symbol)
 		if crumbFile.ok:
 			print("Downloading ", self.symbol)
@@ -146,12 +161,19 @@ class Stock(threading.Thread):
 			self.stockData = json.loads(self.data.text)["chart"]["result"][0]
 			# db.child("stocks").child(self.symbol).set(json.loads(self.data.text)["chart"]["result"][0])
 			self.preProcPriceData()
-			self.getSBSPrices()
-			fiveSMA = self.sma(period=5)
-			sixtySMA = self.sma(period=60)
+			self.isWorthwhile()
 			# db.child("stocks").child(self.symbol).child("5s").set(fiveSMA)
 			# db.child("stocks").child(self.symbol).child("1m").set(sixtySMA)
-	
+	def isWorthwhile(self):
+		self.getSBSPrices()
+		fiveSMA = self.sma(period=5)
+		sixtySMA = self.sma(period=60)
+		if len(fiveSMA['p']) and len(sixtySMA['p']):
+			if fiveSMA['p'][-1] > sixtySMA['p'][-1]:
+				db.child("recommended").child(self.symbol).set({'diff': fiveSMA['p'][-1] - sixtySMA['p'][-1]})
+			else:
+				db.child("recommended").child(self.symbol).remove()
+
 class Exch():
 	def __init__(self, exchange):
 		self.exchange = exchange
@@ -202,10 +224,11 @@ def main(): #need to get list of every symbol in nasdaq
 		thread = Stock(stock, treasuryRate)
 		thread.start()
 		threads.append(thread)
-		if len(threads) == 16:
+		if len(threads) == 4:
 			for t in threads:
 				t.join()
 			threads = []
+			# time.sleep(4)
 
 if __name__ == '__main__':
     main()
