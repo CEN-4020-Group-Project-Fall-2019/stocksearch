@@ -85,7 +85,7 @@ class Stock(threading.Thread):
 				dt = times[curIndex] - times[curIndex-1]
 				dp = prices[curIndex] - prices[curIndex-1]
 				dpodt = dp/dt
-				self.prices.append(prices[curIndex-1] + (curTime-times[curIndex-1]*dpodt))
+				self.prices.append(prices[curIndex-1] + (curTime-times[curIndex-1])*dpodt)
 				self.times.append(curTime)
 				curTime += 1
 			
@@ -170,6 +170,8 @@ class Stock(threading.Thread):
 		sixtySMA = self.sma(period=60)
 		if len(fiveSMA['p']) and len(sixtySMA['p']):
 			if fiveSMA['p'][-1] > sixtySMA['p'][-1]:
+				# print(fiveSMA['p'][-1])
+				# print(self.prices[-1])
 				db.child("recommended").child(self.symbol).set({'diff': fiveSMA['p'][-1] - sixtySMA['p'][-1]})
 			else:
 				db.child("recommended").child(self.symbol).remove()
